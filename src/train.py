@@ -120,7 +120,7 @@ def main():
     model = SimpleCNN()
 
     # Set data directory
-    data_dir = os.path.join(os.getcwd(), 'data')
+    data_dir = os.path.join(os.getcwd(), 'data/training_data')
 
     print("Starting training process...")
     print(f"Loading data from: {data_dir}")

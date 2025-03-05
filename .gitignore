@@ -50,32 +50,6 @@ env/
 *.tflite
 *.mlmodel
 
-# Data
-data/*
-datasets/
-*.csv
-*.json
-*.jpg
-*.jpeg
-*.png
-*.gif
-*.tif
-*.tiff
-*.bmp
-*.webp
-*.mp4
-*.avi
-*.mov
-*.zip
-*.tar
-*.gz
-
-!sample_data/
-!sample_data/cats.jpg
-!sample_data/dogs.jpg
-!data/cats/
-!data/dogs/
-
 # Logs
 logs/
 *.log
