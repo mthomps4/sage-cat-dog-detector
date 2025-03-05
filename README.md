@@ -1,6 +1,6 @@
 # Cat vs Dog Image Classifier
 
-This project demonstrates a simple image classification model that distinguishes between cats and dogs. It's built as a learning exercise for AWS SageMaker, starting with local development and gradually moving to cloud deployment.
+This project demonstrates a simple image classification model that distinguishes between cats and dogs. It's built as a learning exercise, starting with local development and eventually moving to AWS SageMaker deployment.
 
 ## Project Structure
 
@@ -17,7 +17,9 @@ cat_dog_classifier/
 └── README.md           # This file
 ```
 
-## Quick Start
+## Local Development
+
+### Setup
 
 1. Clone the repository:
 
@@ -33,31 +35,53 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-3. Run the training script:
+### Training
+
+1. Ensure you have images in the data directory:
+   - Place cat images in `data/cats/`
+   - Place dog images in `data/dogs/`
+
+2. Run the training script:
 
 ```bash
+# Activate your virtual environment if not already activated
+source venv/bin/activate
+
+# Train the model
 python src/train.py
 ```
 
-## Development Phases
+3. The trained model will be saved as `cat_dog_model.pth`
 
-### Phase 1: Local Development ✅
+### Inference
 
-- Basic CNN implementation
-- Local training and testing
-- Simple data pipeline
+Use the trained model to classify new images:
 
-### Phase 2: SageMaker Development 🔄
+```bash
+chmod +x predict.sh
 
-- Moving to SageMaker training
-- Creating SageMaker endpoint
-- Testing predictions
+# Basic usage
+./predict.sh path/to/image.jpg
 
-### Phase 3: Production 🔄
+# Specify a different model
+./predict.py path/to/image.jpg path/to/other/model.pth
+```
 
-- Model optimization
-- Deployment pipeline
-- Monitoring and logging
+## AWS SageMaker (Future)
+
+This section will be expanded as we implement SageMaker integration.
+
+### Training on SageMaker
+
+Coming soon!
+
+### Deploying an Endpoint
+
+Coming soon!
+
+### Making Predictions
+
+Coming soon!
 
 ## Model Architecture
 
@@ -72,14 +96,7 @@ The current model is a simple CNN with:
 
 - Input: RGB images (resized to 224x224)
 - Classes: Cat, Dog
-- Split: 6 training, 2 testing (for our sample dataset)
-
-## Next Steps
-
-- [ ] Test local training with sample images
-- [ ] Adapt code for SageMaker training
-- [ ] Create SageMaker endpoint
-- [ ] Build inference pipeline
+- Split: 80% training, 20% testing
 
 ## Troubleshooting
 
@@ -93,6 +110,8 @@ The current model is a simple CNN with:
   ```
 
 - If you have issues with image loading, check that your images are valid JPEG/PNG files and are in the correct directories.
+
+- If the model file isn't found during prediction, make sure you're running the script from the project root directory or specify the full path to the model.
 
 ## Resources
 

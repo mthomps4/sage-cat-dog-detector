@@ -52,8 +52,6 @@ env/
 
 # Data
 data/*
-!data/cats/
-!data/dogs/
 datasets/
 *.csv
 *.json
@@ -71,6 +69,12 @@ datasets/
 *.zip
 *.tar
 *.gz
+
+!sample_data/
+!sample_data/cats.jpg
+!sample_data/dogs.jpg
+!data/cats/
+!data/dogs/
 
 # Logs
 logs/
