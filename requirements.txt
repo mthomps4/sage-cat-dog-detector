@@ -1,3 +1,5 @@
 torch
 torchvision
 pillow
+boto3
+sagemaker

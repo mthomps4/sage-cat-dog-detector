@@ -67,21 +67,68 @@ chmod +x predict.sh
 ./predict.py path/to/image.jpg path/to/other/model.pth
 ```
 
-## AWS SageMaker (Future)
+## AWS SageMaker Setup
 
-This section will be expanded as we implement SageMaker integration.
+### 1. Create SageMaker Domain
 
-### Training on SageMaker
+1. Navigate to Amazon SageMaker in AWS Console
+2. Click "Create a Unified Studio domain"
+3. Domain setup:
+   - Name: "Cat Dog Image Predictor"
+   - Description: "Testing Sage with simple Cat Dog image recognition model"
+   - Authentication: Default (AWS IAM)
+   - Network and Storage: Default VPC settings
+   - Permissions: Use default execution role
 
-Coming soon!
+### 2. Configure Project Profile
 
-### Deploying an Endpoint
+1. After domain creation, locate "Next steps for your domain"
+2. Under "Create a project profile", click "Configure" next to "Data analytics and AI/ML model development"
+   - This profile provides tools for:
+     - Building ML models
+     - Training and deployment
+     - Integration with SageMaker capabilities
+   - Skip other profiles (Generative AI, SQL analytics) as they're not needed for our use case
 
-Coming soon!
+### 3. Studio Environment Setup
 
-### Making Predictions
+1. Open SageMaker Studio
+2. Click "Create project" (green button in top right)
+3. Project setup:
+   - Choose a template (we'll use "ML Ops template")
+   - Name: "cat-dog-classifier"
+   - Description: Optional description of your project
+   - Force push code the new project repo
+   - This creates a managed workspace for our:
+     - Code
+     - Notebooks
+     - Model artifacts
+     - Deployment configurations
 
-Coming soon!
+### 4. Create Notebook (Next Step)
+
+After project creation:
+
+1. Navigate to "ML and generative AI model development"
+2. Create notebook within our project
+3. Set up training configuration
+
+### Current Project Status
+
+- ✅ Domain Created
+- ✅ S3 Bucket Setup with Training Data
+- ✅ Local Model Working
+- ✅ Project Profile Configured
+- ✅ Studio Access
+- 🔄 Creating Project
+- ⬜ Creating Training Notebook
+- ⬜ Training Configuration
+- ⬜ Model Deployment
+
+### Project Resources
+
+- Domain URL: https://[your-domain].sagemaker.us-east-1.on.aws/
+- S3 Training Data: s3://[your-bucket]/training_data/
 
 ## Model Architecture
 
