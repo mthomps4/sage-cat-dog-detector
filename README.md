@@ -76,15 +76,16 @@ python src/train.py
 
 ### Next Steps
 
-1. [ ] Create SageMaker endpoint
-2. [ ] Test endpoint with new images
-3. [ ] Set up monitoring and logging
+1. ✅ Create SageMaker endpoint
+2. ✅ Test endpoint with new images
+3. ✅ Set up monitoring and logging
 
 ## Model Details
 
 - Architecture: Simple CNN
 - Framework: PyTorch 2.0
 - Training Environment: SageMaker GPU instance (ml.g4dn.xlarge)
+- Inference Environment: SageMaker CPU instance (ml.t2.large)
 - Data Split: Training (80%), Testing (20%)
 
 ## Model Deployment and Inference
@@ -92,10 +93,12 @@ python src/train.py
 ### Deployment Process
 
 The model is deployed using two key components:
+
 1. `deploy.ipynb` - Notebook for model deployment
 2. `inference.py` - Script that handles prediction requests
 
 #### Deploy Notebook Structure
+
 ```python
 # Create and deploy the model endpoint
 model = PyTorchModel(
@@ -103,88 +106,211 @@ model = PyTorchModel(
     role=role,
     framework_version='2.0',
     py_version='py310',
-    entry_point='inference.py'
+    entry_point='inference.py',
+    source_dir='src'  # Important: points to directory containing inference.py
 )
 
 predictor = model.deploy(
     initial_instance_count=1,
-    instance_type='ml.t2.medium',
+    instance_type='ml.t2.large',  # Important: t2.large needed for stable inference
     endpoint_name='cat-dog-classifier-v1'
 )
 ```
 
-### Inference Script Components
+### Instance Type Selection
 
-The `inference.py` script contains four essential functions that handle the prediction pipeline:
+We found that instance type selection is crucial for stable inference:
 
-1. **model_fn(model_dir)**
-   - Loads the trained model from disk
-   - Initializes model architecture
-   - Puts model in evaluation mode
-   ```python
-   def model_fn(model_dir):
-       device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-       model = CatDogCNN()
-       model.load_state_dict(torch.load(f"{model_dir}/model.pth"))
-       model.eval()
-       return model
-   ```
+- ml.t2.medium: Insufficient for this model (timeout issues)
+- ml.t2.large: Minimum recommended for stable inference
+- ml.m5.xlarge: Recommended for production use
+- ml.p3.2xlarge: When GPU acceleration is needed
 
-2. **input_fn(request_body, request_content_type)**
-   - Processes incoming image data
-   - Applies necessary transformations
-   - Converts image to tensor
-   ```python
-   def input_fn(request_body, request_content_type):
-       image = Image.open(io.BytesIO(request_body))
-       transform = transforms.Compose([
-           transforms.Resize((224, 224)),
-           transforms.ToTensor(),
-           transforms.Normalize([0.485, 0.456, 0.406],
-                             [0.229, 0.224, 0.225])
-       ])
-       return transform(image).unsqueeze(0)
-   ```
+### Testing the Endpoint
 
-3. **predict_fn(input_data, model)**
-   - Runs the actual prediction
-   - Returns probability scores
-   ```python
-   def predict_fn(input_data, model):
-       with torch.no_grad():
-           output = model(input_data)
-           return torch.softmax(output, dim=1)
-   ```
+Created a separate notebook `test_endpoint.ipynb` for testing:
 
-4. **output_fn(prediction, accept)**
-   - Formats prediction results
-   - Returns JSON response
-   ```python
-   def output_fn(prediction, accept):
-       probabilities = prediction.numpy().tolist()[0]
-       return json.dumps({
-           "dog_probability": probabilities[1],
-           "cat_probability": probabilities[0]
-       })
-   ```
+```python
+def test_prediction(image_path):
+    runtime = boto3.client('sagemaker-runtime')
 
-### Making Predictions
+    with open(image_path, 'rb') as f:
+        image_data = f.read()
 
-When deployed, the endpoint accepts HTTP requests with image data and returns predictions in JSON format:
+    response = runtime.invoke_endpoint(
+        EndpointName='cat-dog-classifier-v1',
+        ContentType='application/x-image',
+        Body=image_data
+    )
+
+    result = json.loads(response['Body'].read().decode())
+    return result
+```
+
+Example response:
 
 ```json
 {
-    "cat_probability": 0.1,
-    "dog_probability": 0.9
+    "cat_probability": 0.92,
+    "dog_probability": 0.08
 }
 ```
 
-### Important Notes
+### Endpoint Management
 
-1. The endpoint remains active and incurs costs until explicitly deleted
-2. Input preprocessing must match training preprocessing exactly
-3. GPU acceleration is available depending on the instance type
-4. Monitor endpoint metrics in CloudWatch
+Important considerations:
+
+1. Endpoints incur costs while running
+2. Monitor CloudWatch logs for issues
+3. Delete endpoints when not in use
+4. Consider auto-scaling for production
+
+To delete an endpoint:
+
+```python
+import boto3
+sagemaker_client = boto3.client('sagemaker')
+sagemaker_client.delete_endpoint(EndpointName='cat-dog-classifier-v1')
+```
+
+### Common Endpoint Issues and Solutions
+
+1. **Timeout Errors**
+   - Symptom: ReadTimeoutError during prediction
+   - Solution: Upgrade instance type (ml.t2.large or higher)
+   - Check CloudWatch logs for model loading issues
+
+2. **Model Loading Failures**
+   - Symptom: 500 error on /ping health check
+   - Solution: Verify inference.py matches training architecture
+   - Add logging in model_fn() to debug initialization
+
+3. **Memory Issues**
+   - Symptom: Model crashes or endpoint unhealthy
+   - Solution: Monitor CloudWatch metrics
+   - Consider instance types with more memory
+
+### Development Tips
+
+1. **Local Testing First**
+
+   ```python
+   # Test model locally before deployment
+   model = CatDogCNN()
+   model.load_state_dict(torch.load('model.pth'))
+   model.eval()
+   ```
+
+2. **Debugging Endpoints**
+
+   ```python
+   # Check endpoint status
+   def check_endpoint_status(endpoint_name):
+       client = boto3.client('sagemaker')
+       response = client.describe_endpoint(EndpointName=endpoint_name)
+       return response['EndpointStatus']
+   ```
+
+3. **Cost Management**
+   - Delete endpoints when not in use
+   - Use auto-scaling for production
+   - Monitor usage with AWS Cost Explorer
+
+### Environment Setup
+
+1. **Required IAM Permissions**
+
+   ```json
+   {
+       "Version": "2012-10-17",
+       "Statement": [
+           {
+               "Effect": "Allow",
+               "Action": [
+                   "s3:GetObject",
+                   "s3:PutObject",
+                   "s3:ListBucket"
+               ],
+               "Resource": [
+                   "arn:aws:s3:::your-bucket/*",
+                   "arn:aws:s3:::your-bucket"
+               ]
+           }
+       ]
+   }
+   ```
+
+2. **Dependencies**
+
+   ```bash
+   # Additional dependencies for development
+   pip install sagemaker-studio-image-build
+   pip install pytest
+   pip install black  # for code formatting
+   ```
+
+### Best Practices
+
+1. **Version Control**
+   - Tag model versions in S3
+   - Use semantic versioning for endpoints
+   - Document model changes
+
+2. **Testing**
+   - Unit test inference functions
+   - Test with various image sizes/formats
+   - Benchmark endpoint performance
+
+3. **Monitoring**
+   - Set up CloudWatch alarms
+   - Monitor model accuracy drift
+   - Track endpoint invocations
+
+4. **Security**
+   - Use IAM roles with minimal permissions
+   - Encrypt data in transit and at rest
+   - Regular security audits
+
+### Useful Commands
+
+```bash
+# Check endpoint logs
+aws logs get-log-events --log-group-name /aws/sagemaker/Endpoints/cat-dog-classifier-v1
+
+# Update endpoint
+aws sagemaker update-endpoint --endpoint-name cat-dog-classifier-v1 --endpoint-config-name new-config
+
+# List all endpoints
+aws sagemaker list-endpoints
+```
+
+### Future Improvements
+
+1. **Model Enhancements**
+   - Implement model A/B testing
+   - Add support for multiple model versions
+   - Implement batch prediction capabilities
+
+2. **Infrastructure**
+   - Set up CI/CD pipeline
+   - Add automated testing
+   - Implement blue-green deployments
+
+3. **Monitoring**
+   - Add custom metrics
+   - Set up automated retraining
+   - Implement prediction logging
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new features
+4. Submit a pull request
+
+## License
+
+[Your License Here]
 
 ## Resources
 
