@@ -1,6 +1,6 @@
 # Cat vs Dog Image Classifier
 
-This project demonstrates a simple image classification model that distinguishes between cats and dogs. It's built as a learning exercise, starting with local development and eventually moving to AWS SageMaker deployment.
+This project demonstrates a simple image classification model that distinguishes between cats and dogs, using PyTorch and AWS SageMaker.
 
 ## Project Structure
 
@@ -21,159 +21,181 @@ cat_dog_classifier/
 
 ### Setup
 
-1. Clone the repository:
+1. Clone repository and setup environment:
 
 ```bash
 git clone <repository-url>
 cd cat_dog_classifier
-```
-
-2. Run the setup script:
-
-```bash
 chmod +x setup.sh
 ./setup.sh
 ```
 
-### Training
-
-1. Ensure you have images in the data directory:
-   - Place cat images in `data/cats/`
-   - Place dog images in `data/dogs/`
-
-2. Run the training script:
+### Local Training
 
 ```bash
-# Activate your virtual environment if not already activated
+# Activate virtual environment
 source venv/bin/activate
 
-# Train the model
+# Train model
 python src/train.py
 ```
 
-3. The trained model will be saved as `cat_dog_model.pth`
-
-### Inference
-
-Use the trained model to classify new images:
+### Local Inference
 
 ```bash
-chmod +x predict.sh
-
-# Basic usage
 ./predict.sh path/to/image.jpg
-
-# Specify a different model
-./predict.py path/to/image.jpg path/to/other/model.pth
 ```
 
-## AWS SageMaker Setup
+## AWS SageMaker Development
 
-### 1. Create SageMaker Domain
+### Prerequisites
 
-1. Navigate to Amazon SageMaker in AWS Console
-2. Click "Create a Unified Studio domain"
-3. Domain setup:
+1. AWS Account with SageMaker access
+2. S3 bucket for training data
+3. Appropriate IAM roles and permissions
+
+### Setup Steps Completed
+
+1. ✅ Created SageMaker Domain
    - Name: "Cat Dog Image Predictor"
-   - Description: "Testing Sage with simple Cat Dog image recognition model"
-   - Authentication: Default (AWS IAM)
-   - Network and Storage: Default VPC settings
-   - Permissions: Use default execution role
+   - Project profile configured for ML development
 
-### 2. Configure Project Profile
+2. ✅ Data Preparation
+   - Training data uploaded to S3
+   - Location: `s3://yolo-sagemaker/training_data/`
 
-1. After domain creation, locate "Next steps for your domain"
-2. Under "Create a project profile", click "Configure" next to "Data analytics and AI/ML model development"
-   - This profile provides tools for:
-     - Building ML models
-     - Training and deployment
-     - Integration with SageMaker capabilities
-   - Skip other profiles (Generative AI, SQL analytics) as they're not needed for our use case
+3. ✅ Training Configuration
+   - Created training notebook
+   - Using PyTorch estimator
+   - GPU instance (ml.g4dn.xlarge)
 
-### 3. Studio Environment Setup
+4. ✅ Model Training
+   - Successfully trained on SageMaker
+   - Model artifacts saved to S3
+   - Training job: `pytorch-training-2025-03-06-16-44-33-803`
 
-1. Open SageMaker Studio
-2. Click "Create project" (green button in top right)
-3. Project setup:
-   - Choose a template (we'll use "ML Ops template")
-   - Name: "cat-dog-classifier"
-   - Description: Optional description of your project
-   - Force push code the new project repo
-   - This creates a managed workspace for our:
-     - Code
-     - Notebooks
-     - Model artifacts
-     - Deployment configurations
+### Next Steps
 
-### 4. Create Notebook (Next Step)
+1. [ ] Create SageMaker endpoint
+2. [ ] Test endpoint with new images
+3. [ ] Set up monitoring and logging
 
-After project creation:
+## Model Details
 
-1. Navigate to "ML and generative AI model development"
-2. Create notebook within our project
-3. Set up training configuration
+- Architecture: Simple CNN
+- Framework: PyTorch 2.0
+- Training Environment: SageMaker GPU instance (ml.g4dn.xlarge)
+- Data Split: Training (80%), Testing (20%)
 
-### Current Project Status
+## Model Deployment and Inference
 
-- ✅ Domain Created
-- ✅ S3 Bucket Setup with Training Data
-- ✅ Local Model Working
-- ✅ Project Profile Configured
-- ✅ Studio Access
-- 🔄 Creating Project
-- ⬜ Creating Training Notebook
-- ⬜ Training Configuration
-- ⬜ Model Deployment
+### Deployment Process
 
-### Project Resources
+The model is deployed using two key components:
+1. `deploy.ipynb` - Notebook for model deployment
+2. `inference.py` - Script that handles prediction requests
 
-- Domain URL: https://[your-domain].sagemaker.us-east-1.on.aws/
-- S3 Training Data: s3://[your-bucket]/training_data/
+#### Deploy Notebook Structure
+```python
+# Create and deploy the model endpoint
+model = PyTorchModel(
+    model_data=s3_model_path,
+    role=role,
+    framework_version='2.0',
+    py_version='py310',
+    entry_point='inference.py'
+)
 
-## Model Architecture
+predictor = model.deploy(
+    initial_instance_count=1,
+    instance_type='ml.t2.medium',
+    endpoint_name='cat-dog-classifier-v1'
+)
+```
 
-The current model is a simple CNN with:
+### Inference Script Components
 
-- 2 convolutional layers
-- Max pooling
-- ReLU activation
-- Final fully connected layer
+The `inference.py` script contains four essential functions that handle the prediction pipeline:
 
-## Dataset
+1. **model_fn(model_dir)**
+   - Loads the trained model from disk
+   - Initializes model architecture
+   - Puts model in evaluation mode
+   ```python
+   def model_fn(model_dir):
+       device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+       model = CatDogCNN()
+       model.load_state_dict(torch.load(f"{model_dir}/model.pth"))
+       model.eval()
+       return model
+   ```
 
-- Input: RGB images (resized to 224x224)
-- Classes: Cat, Dog
-- Split: 80% training, 20% testing
+2. **input_fn(request_body, request_content_type)**
+   - Processes incoming image data
+   - Applies necessary transformations
+   - Converts image to tensor
+   ```python
+   def input_fn(request_body, request_content_type):
+       image = Image.open(io.BytesIO(request_body))
+       transform = transforms.Compose([
+           transforms.Resize((224, 224)),
+           transforms.ToTensor(),
+           transforms.Normalize([0.485, 0.456, 0.406],
+                             [0.229, 0.224, 0.225])
+       ])
+       return transform(image).unsqueeze(0)
+   ```
 
-## Troubleshooting
+3. **predict_fn(input_data, model)**
+   - Runs the actual prediction
+   - Returns probability scores
+   ```python
+   def predict_fn(input_data, model):
+       with torch.no_grad():
+           output = model(input_data)
+           return torch.softmax(output, dim=1)
+   ```
 
-### Common Issues
+4. **output_fn(prediction, accept)**
+   - Formats prediction results
+   - Returns JSON response
+   ```python
+   def output_fn(prediction, accept):
+       probabilities = prediction.numpy().tolist()[0]
+       return json.dumps({
+           "dog_probability": probabilities[1],
+           "cat_probability": probabilities[0]
+       })
+   ```
 
-- If you get an error about missing modules, make sure your virtual environment is activated:
+### Making Predictions
 
-  ```bash
-  source venv/bin/activate  # On Mac/Linux
-  venv\Scripts\activate     # On Windows
-  ```
+When deployed, the endpoint accepts HTTP requests with image data and returns predictions in JSON format:
 
-- If you have issues with image loading, check that your images are valid JPEG/PNG files and are in the correct directories.
+```json
+{
+    "cat_probability": 0.1,
+    "dog_probability": 0.9
+}
+```
 
-- If the model file isn't found during prediction, make sure you're running the script from the project root directory or specify the full path to the model.
+### Important Notes
+
+1. The endpoint remains active and incurs costs until explicitly deleted
+2. Input preprocessing must match training preprocessing exactly
+3. GPU acceleration is available depending on the instance type
+4. Monitor endpoint metrics in CloudWatch
 
 ## Resources
 
-- [PyTorch Documentation](https://pytorch.org/docs/stable/index.html)
-- [AWS SageMaker Documentation](https://docs.aws.amazon.com/sagemaker/latest/dg/whatis.html)
-- [CNN Explainer](https://poloclub.github.io/cnn-explainer/)
+- Training Data: `s3://yolo-sagemaker/training_data/`
+- Model Artifacts: `s3://yolo-sagemaker/pytorch-training-2025-03-06-16-44-33-803/output/`
+- SageMaker Domain URL: [Your domain URL]
 
-## Results
+## Troubleshooting
 
-(To be updated with model performance metrics)
+Common issues and solutions:
 
-## Future Improvements
-
-- [ ] Data augmentation
-- [ ] More sophisticated model architecture
-- [ ] SageMaker training implementation
-- [ ] Model deployment
-- [ ] Performance monitoring
+1. S3 Permissions: Ensure proper S3 access policies and permissions boundaries
+2. GPU vs CPU: Training uses GPU instance, local inference uses available hardware
+3. Path Issues: Check relative paths when running scripts from different locations
