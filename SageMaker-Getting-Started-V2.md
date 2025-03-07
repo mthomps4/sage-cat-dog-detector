@@ -74,6 +74,18 @@
    # This can take 5-10 minutes
    ```
 
+4. Create Project Profile
+
+   ```bash
+   1. In the SageMaker Studio, navigate to the "Projects" tab.
+   2. Click on "Create project profile".
+   3. Enter a name for your project profile (e.g., "my-project-profile").
+   4. Select the appropriate execution role that you created earlier.
+   5. Configure any additional settings as needed (e.g., VPC settings, tags).
+   6. Click "Create" to finalize the project profile setup.
+   7. Wait for the confirmation message indicating that the project profile has been created successfully.
+   ```
+
 ## Step 2: Project Setup (15-20 minutes)
 
 ### Launch Studio
